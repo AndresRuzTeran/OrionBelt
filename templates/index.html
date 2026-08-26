@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ORION | Web Telemetry & Vision Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0a0d14;
+      --bg-surface: #121722;
+      --bg-card: #182030;
+      --border-subtle: #222e44;
+      --border-focus: #3b82f6;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-cyan: #06b6d4;
+      --color-fwd: #10b981;
+      --color-fwd-glow: rgba(16, 185, 129, 0.35);
+      --color-stop: #ef4444;
+      --color-stop-glow: rgba(239, 68, 68, 0.45);
+      --color-warn: #f59e0b;
+      --font-ui: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-ui);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Navbar */
+    header {
+      background: rgba(18, 23, 34, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+
+    .brand-title {
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      padding: 0.35rem 0.8rem;
+      border-radius: 9999px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse-dot 2s infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      padding: 1.25rem;
+      max-width: 1600px;
+      margin: 0 auto;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 1.25rem;
+    }
+
+    @media (max-width: 1100px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Video Feed Section */
+    .video-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .video-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 1rem;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .video-header {
+      padding: 0.75rem 1.25rem;
+      background: rgba(24, 32, 48, 0.6);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .video-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .view-modes {
+      display: flex;
+      background: var(--bg-base);
+      padding: 3px;
+      border-radius: 0.5rem;
+      border: 1px solid var(--border-subtle);
+      gap: 2px;
+    }
+
+    .view-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.35rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 0.35rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: var(--font-ui);
+    }
+
+    .view-btn:hover {
+      color: var(--text-main);
+    }
+
+    .view-btn.active {
+      background: var(--border-focus);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+    }
+
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      background: #000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 380px;
+    }
+
+    .video-feed {
+      width: 100%;
+      height: auto;
+      display: block;
+      object-fit: contain;
+      max-height: 65vh;
+    }
+
+    /* Action Banner Overlay */
+    .action-overlay {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      padding: 0.5rem 1.25rem;
+      border-radius: 0.6rem;
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      backdrop-filter: blur(8px);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+
+    .action-overlay.FORWARD {
+      background: rgba(16, 185, 129, 0.85);
+      color: #ffffff;
+      border: 1px solid #10b981;
+      box-shadow: 0 0 20px var(--color-fwd-glow);
+    }
+
+    .action-overlay.STOP {
+      background: rgba(239, 68, 68, 0.9);
+      color: #ffffff;
+      border: 1px solid #ef4444;
+      box-shadow: 0 0 25px var(--color-stop-glow);
+      animation: alert-pulse 1s infinite alternate;
+    }
+
+    @keyframes alert-pulse {
+      0% { transform: scale(1); filter: brightness(1); }
+      100% { transform: scale(1.04); filter: brightness(1.2); }
+    }
+
+    /* Live Telemetry Graph */
+    .graph-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 1rem;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .graph-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .graph-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      height: 120px;
+    }
+
+    #telemetryCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Sidebar / Dashboard */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 1rem;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .card-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Proximity Meter */
+    .proximity-display {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      align-items: center;
+      text-align: center;
+      padding: 0.5rem 0;
+    }
+
+    .proximity-value {
+      font-size: 3rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      line-height: 1;
+      transition: color 0.3s;
+    }
+
+    .proximity-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .meter-bar-container {
+      width: 100%;
+      height: 14px;
+      background: #0f131c;
+      border-radius: 9999px;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .meter-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981, #f59e0b 60%, #ef4444);
+      border-radius: 9999px;
+      transition: width 0.15s ease-out;
+    }
+
+    .meter-threshold-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #ffffff;
+      box-shadow: 0 0 6px #ffffff;
+      transform: translateX(-50%);
+    }
+
+    /* Telemetry Grid */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .metric-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .metric-val {
+      font-size: 1.15rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-main);
+    }
+
+    /* Controls */
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .control-label span {
+      font-family: var(--font-mono);
+      color: var(--accent-blue);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 9999px;
+      background: var(--bg-card);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent-blue);
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+      transition: transform 0.1s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      transition: .3s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: var(--text-muted);
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--border-focus);
+      border-color: var(--border-focus);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(20px);
+      background-color: #ffffff;
+    }
+
+    /* Footer */
+    footer {
+      padding: 1rem 1.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="brand-logo">🌌</span>
+      <div>
+        <div class="brand-title">ORION Web Dashboard</div>
+        <div class="brand-subtitle">By AudacIA</div>
+      </div>
+    </div>
+    <div class="status-badge">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="connectionText">EN LÍNEA</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Column: Video & Chart -->
+    <div class="video-section">
+      <div class="video-card">
+        <div class="video-header">
+          <div class="video-title">
+            <span>🔴 Stream en Vivo</span>
+            <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-blue);" id="streamInfo">320px | MJPEG</span>
+          </div>
+          <div class="view-modes">
+            <button class="view-btn active" data-mode="combined">Combinado</button>
+            <button class="view-btn" data-mode="raw">Cámara</button>
+            <button class="view-btn" data-mode="depth">Profundidad</button>
+          </div>
+        </div>
+        <div class="video-wrapper">
+          <img src="/video_feed" alt="ORION Stream" class="video-feed" id="videoFeed">
+          <div class="action-overlay FORWARD" id="actionOverlay">
+            <span id="actionIcon">▲</span>
+            <span id="actionText">FORWARD</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trend Chart -->
+      <div class="graph-card">
+        <div class="graph-header">
+          <div class="graph-title">📈 Historial de Proximidad en Tiempo Real</div>
+          <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);" id="graphStats">Últimos 15 seg</div>
+        </div>
+        <div class="canvas-container">
+          <canvas id="telemetryCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Sidebar Controls & Telemetry -->
+    <div class="sidebar">
+      <!-- Proximity Card -->
+      <div class="card">
+        <div class="card-title">🎯 Proximidad del Obstáculo</div>
+        <div class="proximity-display">
+          <div class="proximity-value" id="proxValText" style="color: var(--color-fwd);">0.0%</div>
+          <div class="proximity-label">Corredor Central de Avance</div>
+          
+          <div class="meter-bar-container">
+            <div class="meter-bar-fill" id="meterFill"></div>
+            <div class="meter-threshold-marker" id="threshMarker" style="left: 60%;"></div>
+          </div>
+        </div>
+
+        <div class="telemetry-grid">
+          <div class="metric-box">
+            <div class="metric-label">FPS Inferencia</div>
+            <div class="metric-val" id="fpsVal">--</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Aceleración</div>
+            <div class="metric-val" id="deviceVal" style="color: var(--accent-cyan);">--</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Umbral Activo</div>
+            <div class="metric-val" id="threshVal">60%</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Intensidad</div>
+            <div class="metric-val" id="intensityVal">0%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Controls Card -->
+      <div class="card">
+        <div class="card-title">⚙️ Controles en Vivo</div>
+
+        <!-- Slider Umbral -->
+        <div class="control-group">
+          <div class="control-label">
+            <span>Umbral de Activación STOP</span>
+            <span id="nearThreshLabel">60%</span>
+          </div>
+          <input type="range" id="thresholdSlider" min="20" max="90" value="60" step="1">
+          <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--text-muted);">
+            <span>20% (Muy lejos)</span>
+            <span>90% (Muy cerca)</span>
+          </div>
+        </div>
+
+        <!-- Mute Audio Local -->
+        <div class="toggle-row">
+          <div>
+            <div style="font-weight: 600; font-size: 0.9rem;">Alarma Sonora Local</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Beeps acústicos en el ordenador</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="localSoundToggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    ORION Navigation Core • Transmisión Web Asíncrona & Telemetría en Tiempo Real
+  </footer>
+
+  <script>
+    // Elements
+    const videoFeed = document.getElementById('videoFeed');
+    const actionOverlay = document.getElementById('actionOverlay');
+    const actionText = document.getElementById('actionText');
+    const actionIcon = document.getElementById('actionIcon');
+    const proxValText = document.getElementById('proxValText');
+    const meterFill = document.getElementById('meterFill');
+    const threshMarker = document.getElementById('threshMarker');
+    const fpsVal = document.getElementById('fpsVal');
+    const deviceVal = document.getElementById('deviceVal');
+    const threshVal = document.getElementById('threshVal');
+    const intensityVal = document.getElementById('intensityVal');
+    const nearThreshLabel = document.getElementById('nearThreshLabel');
+    const thresholdSlider = document.getElementById('thresholdSlider');
+    const localSoundToggle = document.getElementById('localSoundToggle');
+    const statusDot = document.getElementById('statusDot');
+    const connectionText = document.getElementById('connectionText');
+    const viewButtons = document.querySelectorAll('.view-btn');
+    const canvas = document.getElementById('telemetryCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Chart history
+    const MAX_POINTS = 80;
+    const historyData = [];
+    let currentThreshold = 0.60;
+
+    // Adjust canvas resolution
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth * window.devicePixelRatio;
+      canvas.height = canvas.parentElement.clientHeight * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // View Mode Switching
+    viewButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        viewButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.mode;
+        videoFeed.src = `/video_feed?mode=${mode}&t=${Date.now()}`;
+      });
+    });
+
+    // Draw Real-time Chart
+    function drawChart() {
+      const w = canvas.parentElement.clientWidth;
+      const h = canvas.parentElement.clientHeight;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Grid lines
+      ctx.strokeStyle = '#222e44';
+      ctx.lineWidth = 1;
+      for (let y = 0.25; y < 1.0; y += 0.25) {
+        const yPos = h - y * h;
+        ctx.beginPath();
+        ctx.moveTo(0, yPos);
+        ctx.lineTo(w, yPos);
+        ctx.stroke();
+      }
+
+      // Threshold line
+      const threshY = h - currentThreshold * h;
+      ctx.strokeStyle = '#f59e0b';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, threshY);
+      ctx.lineTo(w, threshY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (historyData.length < 2) return;
+
+      // Draw curve
+      ctx.beginPath();
+      const step = w / (MAX_POINTS - 1);
+      for (let i = 0; i < historyData.length; i++) {
+        const x = i * step;
+        const y = h - historyData[i] * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Area fill
+      ctx.lineTo((historyData.length - 1) * step, h);
+      ctx.lineTo(0, h);
+      ctx.closePath();
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+      grad.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    // WebSocket Telemetry Connection with HTTP Polling Fallback
+    let ws = null;
+    let isConnected = false;
+    let pollInterval = null;
+
+    function setOnline(mode = 'WS') {
+      isConnected = true;
+      statusDot.style.background = '#10b981';
+      statusDot.style.boxShadow = '0 0 8px #10b981';
+      connectionText.textContent = `EN LÍNEA (${mode})`;
+    }
+
+    function setOffline() {
+      isConnected = false;
+      statusDot.style.background = '#ef4444';
+      statusDot.style.boxShadow = '0 0 8px #ef4444';
+      connectionText.textContent = 'RECONECTANDO...';
+    }
+
+    function connectWS() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/telemetry`;
+      
+      try {
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          setOnline('WS');
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            updateTelemetry(data);
+          } catch (e) {}
+        };
+
+        ws.onclose = () => {
+          setOffline();
+          startHttpPollingFallback();
+          setTimeout(connectWS, 2500);
+        };
+
+        ws.onerror = () => {
+          if (ws) ws.close();
+        };
+      } catch (e) {
+        startHttpPollingFallback();
+      }
+    }
+
+    function startHttpPollingFallback() {
+      if (pollInterval) return;
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch('/api/status');
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.action) {
+              setOnline('HTTP');
+              updateTelemetry(data);
+            }
+          }
+        } catch (err) {}
+      }, 100);
+    }
+
+    function updateTelemetry(data) {
+      if (!data) return;
+
+      // 1. Action Badge
+      const action = data.action || 'FORWARD';
+      actionOverlay.className = `action-overlay ${action}`;
+      actionText.textContent = action;
+      actionIcon.textContent = action === 'FORWARD' ? '▲' : '🛑';
+
+      // 2. Proximity Values
+      const prox = data.center_prox || 0.0;
+      const proxPct = (prox * 100).toFixed(1);
+      proxValText.textContent = `${proxPct}%`;
+      proxValText.style.color = action === 'STOP' ? 'var(--color-stop)' : 'var(--color-fwd)';
+      meterFill.style.width = `${Math.min(100, Math.max(0, prox * 100))}%`;
+
+      // 3. Threshold
+      if (data.near_threshold !== undefined) {
+        currentThreshold = data.near_threshold;
+        threshMarker.style.left = `${currentThreshold * 100}%`;
+        threshVal.textContent = `${(currentThreshold * 100).toFixed(0)}%`;
+      }
+
+      // 4. Metrics
+      fpsVal.textContent = (data.fps || 0).toFixed(1);
+      deviceVal.textContent = (data.device || 'CPU').toUpperCase();
+      intensityVal.textContent = `${((data.intensity || 0) * 100).toFixed(0)}%`;
+
+      // 5. Chart Data
+      historyData.push(prox);
+      if (historyData.length > MAX_POINTS) historyData.shift();
+      drawChart();
+    }
+
+    // Sliders & Controls handlers
+    thresholdSlider.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value) / 100.0;
+      nearThreshLabel.textContent = `${e.target.value}%`;
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ near_threshold: val })
+      });
+    });
+
+    localSoundToggle.addEventListener('change', (e) => {
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ local_sound_enabled: e.target.checked })
+      });
+    });
+
+    // Start with instant polling check + WS connect
+    startHttpPollingFallback();
+    connectWS();
+  </script>
+</body>
+</html>

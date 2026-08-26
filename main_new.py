@@ -32,7 +32,7 @@ except ImportError:
 
 
 MODEL_TYPE_DEFAULT = "MiDaS_small"
-WINDOW_NAME = "ORION | Frame + Depth"
+WINDOW_NAME = "ORION v3 | Frame + Depth (Telemetry HUD)"
 MIN_WINDOW_WIDTH = 1000  # Tamaño mínimo fijo de la pestaña, en píxeles.
 
 
@@ -72,7 +72,7 @@ def resolve_device(preferred: str = "auto") -> torch.device:
     Resuelve el backend de cómputo a usar.
 
     'auto' prioriza CUDA (si existe) y luego MPS (Apple Silicon),
-    que es el caso relevante para un Mac M1 sin GPU NVIDIA.
+    que es el caso relevante para un Mac M1/M2/M3/M4.
     """
     preferred = (preferred or "auto").lower()
 
@@ -106,9 +106,6 @@ def load_midas_torch(model_type: str, device: torch.device):
     try:
         model.to(device)
     except (RuntimeError, NotImplementedError) as exc:
-        # Salvaguarda: si el backend elegido falla al mover el modelo
-        # (poco común, pero posible en versiones viejas de PyTorch con MPS),
-        # se cae a CPU en vez de tumbar el programa.
         print(f"⚠️ No se pudo mover el modelo a {device}: {exc}. Usando CPU.")
         device = torch.device("cpu")
         model.to(device)
@@ -142,9 +139,6 @@ def infer_depth_torch(
             prediction = model(input_batch)
 
     elif device.type == "mps" and use_fp16_mps and not infer_depth_torch._mps_fp16_failed:
-        # FP16 en MPS es experimental: si el kernel de alguna operación
-        # no lo soporta, se desactiva una sola vez y se sigue en FP32
-        # sin volver a intentarlo en cada frame (evita overhead repetido).
         try:
             with torch.autocast(device_type="mps", dtype=torch.float16):
                 prediction = model(input_batch)
@@ -166,11 +160,16 @@ def infer_depth_torch(
     return prediction.float().cpu().numpy()
 
 
-# Estado estático de la función (se resetea si el proceso se reinicia).
 infer_depth_torch._mps_fp16_failed = False
 
 
 def normalize_depth(depth_raw: np.ndarray, invert: bool) -> np.ndarray:
+    """
+    Normaliza la profundidad relativa/disparidad inversa de MiDaS al rango [0.0, 1.0].
+    
+    - 0.0: Punto más lejano / fondo de la escena observada.
+    - 1.0: Objeto más cercano al lente en la escena observada.
+    """
     min_value = float(depth_raw.min())
     max_value = float(depth_raw.max())
     span = max_value - min_value
@@ -192,10 +191,13 @@ def analyze_depth(
     sample_step: int = 4,
 ):
     """
-    Igual que la lógica original (decide STOP/FORWARD), pero además
-    devuelve una 'intensidad' de 0 a 1 que indica qué tan por encima
-    del umbral de cercanía está el objeto — usada para escalar las
-    alertas (más cerca = alerta más intensa y frecuente).
+    Analiza el mapa de profundidad normalizado.
+    
+    Devuelve:
+      - action: 'STOP' o 'FORWARD'
+      - intensity: float (0.0 a 1.0) indicando qué tan por encima del umbral está
+      - center_mean: proximidad relativa promedio en el tercio central (0.0 a 1.0)
+      - overall_mean: proximidad promedio de toda la escena (0.0 a 1.0)
     """
     depth = depth_norm[::sample_step, ::sample_step] if sample_step > 1 else depth_norm
 
@@ -215,7 +217,7 @@ def analyze_depth(
     else:
         intensity = 0.0
 
-    return action, intensity
+    return action, intensity, center_mean, overall_mean
 
 
 def colorize_depth(depth_norm: np.ndarray) -> np.ndarray:
@@ -223,23 +225,71 @@ def colorize_depth(depth_norm: np.ndarray) -> np.ndarray:
     return cv2.applyColorMap(depth_uint8, cv2.COLORMAP_MAGMA)
 
 
-def draw_regions_and_action(frame: np.ndarray, action: str) -> None:
+# ---------------------------------------------------------------------------
+# Visualización y Renderizado de Texto / Telemetría 
+# ---------------------------------------------------------------------------
+
+def draw_regions_and_action(
+    frame: np.ndarray,
+    action: str,
+    center_prox: float = 0.0,
+    near_threshold: float = 0.6,
+) -> None:
+    """
+    Dibuja los delimitadores de carril, el estado de acción con tamaño de letra
+    reducido y una barra de telemetría de proximidad medida.
+    """
     h, w = frame.shape[:2]
     third = w // 3
 
-    cv2.line(frame, (third, 0), (third, h), (0, 255, 255), 1)
-    cv2.line(frame, (2 * third, 0), (2 * third, h), (0, 255, 255), 1)
+    # Líneas divisorias de carril central (amarillas tenues)
+    cv2.line(frame, (third, 0), (third, h), (0, 200, 200), 1)
+    cv2.line(frame, (2 * third, 0), (2 * third, h), (0, 200, 200), 1)
 
+    action_color = (0, 255, 0) if action == "FORWARD" else (0, 0, 255)
     cv2.putText(
         frame,
         f"Action: {action}",
-        (10, 30),
+        (10, 20),                  # Coordenadas (X, Y)
+        cv2.FONT_HERSHEY_SIMPLEX,  # Tipografía
+        0.39,                       # Tamaño del texto 
+        action_color,              # Color (Verde para FORWARD, Rojo para STOP)
+        1,                         # Grosor del texto
+        cv2.LINE_AA,               # Anti-aliasing suave
+    )
+
+    # Telemetría de Proximidad Medida (Porcentaje relativo y umbral)
+    prox_percent = center_prox * 100.0
+    thresh_percent = near_threshold * 100.0
+    cv2.putText(
+        frame,
+        f"Prox: {prox_percent:4.1f}% | Umbral: {thresh_percent:.0f}%",
+        (10, 36),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.8,
-        (0, 255, 0) if action == "FORWARD" else (0, 0, 255),
+        0.29,                      # Tamaño de fuente pequeño para métricas
+        (220, 220, 220),
         2,
         cv2.LINE_AA,
     )
+
+    # Barra gráfica de proximidad
+    bar_x = 10
+    bar_y = 44
+    bar_w = min(120, int(third * 0.8))
+    bar_h = 6
+    
+    # Fondo de la barra (gris oscuro)
+    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (40, 40, 40), -1)
+    
+    # Relleno de la barra según nivel de proximidad
+    fill_w = int(bar_w * min(1.0, max(0.0, center_prox)))
+    fill_color = (0, 220, 0) if center_prox < near_threshold else (0, 0, 255)
+    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + fill_w, bar_y + bar_h), fill_color, -1)
+    
+    # Borde de la barra y marca del umbral
+    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (180, 180, 180), 1)
+    thresh_x = bar_x + int(bar_w * near_threshold)
+    cv2.line(frame, (thresh_x, bar_y - 1), (thresh_x, bar_y + bar_h + 1), (0, 255, 255), 1)
 
 
 # ---------------------------------------------------------------------------
@@ -267,16 +317,11 @@ def _generate_tone_pcm(
 
 class LocalAlarmSound:
     """
-    Alerta sonora reproducida en el propio Mac. Define 4 niveles de
+    Alerta sonora reproducida en el propio ordenador. Define 4 niveles de
     urgencia: entre más cerca esté el obstáculo, más agudo, más fuerte
     y más frecuente es el beep.
-
-    Backend de reproducción (en orden de preferencia):
-      1. 'simpleaudio' si está instalado (menor latencia, sin subprocesos).
-      2. 'afplay' (viene incluido en macOS, no requiere instalar nada).
     """
 
-    # (intensidad_mínima, frecuencia_hz, duración_s, intervalo_s, volumen)
     LEVELS = [
         (0.00, 700.0, 0.12, 0.55, 0.55),
         (0.30, 950.0, 0.14, 0.38, 0.70),
@@ -354,7 +399,6 @@ class LocalAlarmSound:
                     stderr=subprocess.DEVNULL,
                 )
         except Exception:
-            # Un fallo puntual de audio no debe tumbar la alerta completa.
             pass
 
     def cleanup(self) -> None:
@@ -368,16 +412,7 @@ class LocalAlarmSound:
 class AlarmManager:
     """
     Orquesta la alerta iterativa (sonido local + buzzer del ESP32)
-    mientras el estado sea STOP.
-
-    - Corre en su propio hilo con su propio temporizador, así que no
-      depende del framerate de inferencia: si STOP se mantiene, el
-      hilo sigue sonando en bucle sin cortarse.
-    - El intervalo entre beeps y el duty del buzzer escalan con la
-      intensidad (qué tan cerca está el objeto): más cerca = más
-      rápido y más fuerte.
-    - En cuanto el estado deja de ser STOP, se silencia de inmediato
-      (incluyendo apagar el buzzer del ESP32 explícitamente).
+    mientras el estado sea STOP en un hilo dedicado.
     """
 
     def __init__(
@@ -432,8 +467,6 @@ class AlarmManager:
                 interval = self.local_sound.interval_for_level(level)
                 self.local_sound.play(level)
             else:
-                # Sin sonido local: igual escalamos el ritmo del buzzer
-                # del ESP32 según la intensidad.
                 interval = 0.55 - 0.40 * intensity
 
             if self.esp is not None:
@@ -855,16 +888,7 @@ def infer_esp_base_from_src(src: str) -> str:
 
 
 class EspController:
-    """
-    Persistent HTTP session para el ESP32.
-
-    - set_buzzer(on): filtra por cambio de estado (solo envía cuando
-      pasa de encendido a apagado o viceversa). Se usa para apagar el
-      buzzer de forma explícita al salir de STOP.
-    - pulse_buzzer(duty, duration_ms): envía SIEMPRE un pulso, sin
-      filtrar por estado. Es lo que usa AlarmManager para sonar de
-      forma iterativa mientras el estado siga siendo STOP.
-    """
+    """Persistent HTTP session para el microcontrolador ESP32-CAM."""
 
     def __init__(self, base_url: str, buzzer_duty: int = 200):
         self.base_url = base_url.rstrip("/")
@@ -903,7 +927,6 @@ class EspController:
         )
 
     def pulse_buzzer(self, duty: int, duration_ms: int = 150):
-        """Pulso de buzzer sin filtrar por estado (para alerta iterativa)."""
         if not self.base_url:
             return
 
@@ -930,11 +953,16 @@ class EspController:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="ORION optimized: MiDaS depth + ESP32-CAM (Mac M1 / MPS ready)"
+        description="ORION v3: MiDaS depth + ESP32-CAM (Telemetry HUD & Compact UI)"
     )
 
     parser.add_argument("--src", default="0")
-    parser.add_argument("--near-threshold", type=float, default=0.6)
+    parser.add_argument(
+        "--near-threshold",
+        type=float,
+        default=0.6,
+        help="Umbral relativo de proximidad en zona central para STOP (0.0 a 1.0)",
+    )
     parser.add_argument("--invert-depth", action="store_true")
     parser.add_argument("--no-gui", action="store_true")
     parser.add_argument("--save", default="")
@@ -949,10 +977,10 @@ def parse_args():
     parser.add_argument("--led-duty", type=int, default=255)
     parser.add_argument("--buzzer-duty", type=int, default=200)
     parser.add_argument("--buzzer-duration", type=int, default=150)
-    parser.add_argument("--display-width", type=int, default=1000)
+    parser.add_argument("--display-width", type=int, default=1900)
     parser.add_argument("--display-scale", type=float, default=1.0)
 
-    # Latest-frame mode is enabled by default for low latency.
+    # Lectura asíncrona por defecto para baja latencia
     parser.add_argument("--async-capture", action="store_true", default=True)
     parser.add_argument(
         "--sync-capture",
@@ -999,7 +1027,7 @@ def parse_args():
         help="Disable PC alert sound.",
     )
 
-    # --- Mac M1 / Apple Silicon ---
+    # --- Hardware Mac M1 / Apple Silicon ---
     parser.add_argument(
         "--device",
         default="auto",
@@ -1009,16 +1037,13 @@ def parse_args():
     parser.add_argument(
         "--mps-fp16",
         action="store_true",
-        help=(
-            "Intenta autocast FP16 en MPS (experimental; puede no estar "
-            "soportado en tu versión de PyTorch, en cuyo caso se cae a FP32 solo)."
-        ),
+        help="Intenta autocast FP16 en MPS (experimental).",
     )
     parser.add_argument(
         "--cv-threads",
         type=int,
         default=0,
-        help="Fuerza el número de hilos internos de OpenCV. 0 = no tocar.",
+        help="Fuerza el número de hilos internos de OpenCV.",
     )
     parser.add_argument(
         "--mps-empty-cache-every",
@@ -1032,8 +1057,6 @@ def parse_args():
 
 def open_capture(source: str, bufsize: int = 1):
     if source.isdigit():
-        # AVFoundation es el backend correcto/estable para cámaras en macOS;
-        # en otros sistemas se deja que OpenCV elija automáticamente.
         backend = cv2.CAP_AVFOUNDATION if sys.platform == "darwin" else cv2.CAP_ANY
         cap = cv2.VideoCapture(int(source), backend)
     else:
@@ -1063,7 +1086,6 @@ def main():
         args.esp_base = f"http://{esp_ip}"
         print(f"🎯 Usando ESP32-CAM: {esp_ip}")
 
-    # Configure PyTorch BEFORE loading the model.
     configure_torch(args.torch_threads)
 
     if args.cv_threads > 0:
@@ -1087,7 +1109,6 @@ def main():
     esp = EspController(esp_base, args.buzzer_duty) if esp_base else None
 
     if esp:
-        # Startup-only requests.
         esp.set_param("quality", args.esp_quality)
         esp.set_param("framesize", args.esp_framesize)
 
@@ -1139,7 +1160,6 @@ def main():
             print(f"❌ No se pudo abrir la fuente: {args.src}")
             return
 
-        # Default: always process the newest frame.
         if args.async_capture and not args.sync_capture:
             async_reader = LatestFrameReader(capture).start()
 
@@ -1167,6 +1187,8 @@ def main():
     last_depth = None
     last_depth_norm = None
     last_action = "FORWARD"
+    last_intensity = 0.0
+    last_center_prox = 0.0
 
     frame_counter = 0
     fps_counter = 0
@@ -1179,11 +1201,9 @@ def main():
         and hasattr(torch.mps, "empty_cache")
     )
 
-    # Lista de un elemento en vez de bool suelto: así el bloque de
-    # visualización (dentro del while) puede marcarlo como ya inicializado.
     window_ready = [False]
 
-    print("▶️ ORION optimizado iniciado. Presiona 'q' para salir.")
+    print("▶️ ORION v3 iniciado. Presiona 'q' para salir.")
 
     try:
         while True:
@@ -1212,7 +1232,6 @@ def main():
 
             frame_counter += 1
 
-            # Resize BEFORE MiDaS.
             proc_frame = frame_bgr
 
             if args.proc_width > 0 and frame_bgr.shape[1] > args.proc_width:
@@ -1240,7 +1259,6 @@ def main():
                     0,
                 )
 
-            # Optional inference skipping.
             run_inference = (
                 last_depth is None
                 or args.inference_every <= 1
@@ -1261,7 +1279,6 @@ def main():
                     invert=args.invert_depth,
                 )
 
-                # Temporal smoothing without allocating a new array.
                 if 0.0 < args.temporal_alpha < 1.0:
                     if prev_depth is None or prev_depth.shape != depth_norm.shape:
                         prev_depth = depth_norm.copy()
@@ -1276,21 +1293,16 @@ def main():
 
                 last_depth_norm = depth_used
 
-                last_action, intensity = analyze_depth(
+                last_action, last_intensity, last_center_prox, _overall = analyze_depth(
                     depth_used,
                     near_threshold=args.near_threshold,
                 )
 
-                # La alerta ahora es iterativa y escala con la cercanía:
-                # AlarmManager, en su propio hilo, se encarga de sonar
-                # en bucle mientras el estado siga siendo STOP.
-                alarm.update(active=(last_action == "STOP"), intensity=intensity)
+                alarm.update(active=(last_action == "STOP"), intensity=last_intensity)
 
             else:
                 depth_used = last_depth_norm
 
-            # Liberación periódica de caché en MPS: evita crecimiento de
-            # memoria en sesiones largas sin penalizar cada frame.
             if (
                 mps_cache_supported
                 and args.mps_empty_cache_every > 0
@@ -1301,21 +1313,22 @@ def main():
                 except Exception:
                     pass
 
-            # Visualization at processing resolution.
             if not args.no_gui or video_writer is not None:
                 depth_vis = colorize_depth(depth_used)
-                draw_regions_and_action(depth_vis, last_action)
+                
+                # Renderizado de carril, acción con tamaño compacto y telemetría de proximidad
+                draw_regions_and_action(
+                    depth_vis,
+                    last_action,
+                    center_prox=last_center_prox,
+                    near_threshold=args.near_threshold,
+                )
 
                 stacked = np.hstack((proc_frame, depth_vis))
 
                 if not args.no_gui:
                     vis = stacked
 
-                    # Ancho objetivo fijo (mínimo MIN_WINDOW_WIDTH, aunque
-                    # --display-width se pase más chico). Se reescala tanto
-                    # si la imagen es más grande como si es más chica, para
-                    # que la pestaña siempre se vea igual de tamaño y no
-                    # "salte" de tamaño entre frames.
                     target_width = max(args.display_width, MIN_WINDOW_WIDTH)
 
                     if target_width > 0 and vis.shape[1] != target_width:
@@ -1334,9 +1347,6 @@ def main():
                         )
 
                     if not window_ready[0]:
-                        # WINDOW_NORMAL permite fijar un tamaño de pestaña
-                        # explícito en píxeles en vez de que se ajuste solo
-                        # al contenido (que era lo que se veía "chico y raro").
                         cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
                         cv2.resizeWindow(WINDOW_NAME, vis.shape[1], vis.shape[0])
                         window_ready[0] = True
@@ -1358,8 +1368,8 @@ def main():
                 fps_time = now
 
             sys.stdout.write(
-                f"\rDecision: {last_action:<7} | FPS: {displayed_fps:5.1f} | "
-                f"Device: {device.type} "
+                f"\rDecision: {last_action:<7} | Prox: {last_center_prox*100:4.1f}% | "
+                f"FPS: {displayed_fps:5.1f} | Device: {device.type} "
             )
             sys.stdout.flush()
 
@@ -1388,7 +1398,7 @@ def main():
         if not args.no_gui:
             cv2.destroyAllWindows()
 
-        print("\n✅ ORION finalizado.")
+        print("\n✅ ORION v3 finalizado.")
 
 
 if __name__ == "__main__":
