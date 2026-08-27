@@ -660,10 +660,6 @@
     const historyData = [];
     let currentThreshold = 0.60;
 
-    let lastFrameCount = -1;
-    let lastFrameChangeTime = Date.now();
-    const FREEZE_TIMEOUT_MS = 4000; // si no avanza en 4s, se considera congelado
-
     // Adjust canvas resolution
     function resizeCanvas() {
       canvas.width = canvas.parentElement.clientWidth * window.devicePixelRatio;
@@ -847,20 +843,6 @@
       if (historyData.length > MAX_POINTS) historyData.shift();
       drawChart();
 
-      if (data.frame_count !== undefined) {
-        if (data.frame_count !== lastFrameCount) {
-          lastFrameCount = data.frame_count;
-          lastFrameChangeTime = Date.now();
-        } else if (Date.now() - lastFrameChangeTime > FREEZE_TIMEOUT_MS) {
-          refreshVideoStream();
-          lastFrameChangeTime = Date.now(); // evita refrescar en bucle mientras sigue congelado
-        }
-      }
-    }
-
-    function refreshVideoStream() {
-      const currentMode = document.querySelector('.view-btn.active')?.dataset.mode || 'combined';
-      videoFeed.src = `/video_feed?mode=${currentMode}&t=${Date.now()}`;
     }
 
     // Sliders & Controls handlers
