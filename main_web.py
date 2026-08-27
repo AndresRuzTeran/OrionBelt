@@ -12,7 +12,6 @@ import tempfile
 import threading
 import time
 import wave
-import webbrowser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlparse
@@ -1273,12 +1272,7 @@ def main():
     )
     server_instance = uvicorn.Server(config)
 
-    # Abrir el navegador automáticamente con el puerto correcto una vez que el servidor esté listo
-    def _open_browser():
-        time.sleep(1.5)  # Esperar a que Uvicorn esté escuchando
-        webbrowser.open(f"http://localhost:{chosen_port}")
 
-    threading.Thread(target=_open_browser, daemon=True).start()
 
     try:
         server_instance.run()
