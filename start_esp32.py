@@ -13,11 +13,9 @@ def main():
     
     # Ejecutar el script principal con detección automática
     cmd = [
-        sys.executable, "main.py",
+        sys.executable, "main_web_esp32.py",
         "--auto-find",
-        "--model-type", "MiDaS_small",
-        "--proc-width", "160",
-        "--async-capture"
+        "--no-local-sound"
     ]
     
     print("🔍 Buscando ESP32-CAM automáticamente...")

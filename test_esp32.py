@@ -60,16 +60,16 @@ def main():
     print("=" * 50)
     
     # Probar IP conocida
-    if test_esp32_connection("172.16.121.9"):
+    if test_esp32_connection("172.16.121.114"):
         print("\n🎉 ¡ESP32-CAM está funcionando correctamente!")
         print("📝 Comando para usar:")
-        print("python main.py --src http://172.16.121.9:81/stream --esp-base http://172.16.121.9 --model-type MiDaS_small --proc-width 160 --async-capture")
+        print("python main.py --src http://172.16.121.114:81/stream --esp-base http://172.16.121.114 --model-type MiDaS_small --proc-width 160 --async-capture")
     else:
         print("\n❌ No se pudo conectar al ESP32-CAM")
         print("💡 Verificaciones:")
         print("   - ¿El ESP32 está encendido?")
         print("   - ¿Está en la misma red WiFi?")
-        print("   - ¿Puedes abrir http://172.16.121.9:81/stream en el navegador?")
+        print("   - ¿Puedes abrir http://172.16.121.114:81/stream en el navegador?")
 
 if __name__ == "__main__":
     main()

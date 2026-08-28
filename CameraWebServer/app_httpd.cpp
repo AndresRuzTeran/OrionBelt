@@ -27,7 +27,6 @@
 #endif
 
 // LED FLASH setup
-#define LEDC_CH 0
 #if defined(LED_GPIO_NUM)
 #define CONFIG_LED_MAX_INTENSITY 255
 
@@ -38,7 +37,6 @@ bool isStreaming = false;
 
 // BUZZER setup
 #define BUZZER_GPIO_NUM 2  // Pin 2 para el buzzer
-#define BUZZER_CH 1        // Canal PWM diferente al LED
 
 int buzzer_duty = 0;
 bool buzzer_active = false;
@@ -102,7 +100,7 @@ void enable_led(bool en) {  // Turn LED On or Off
   if (en && isStreaming && (led_duty > CONFIG_LED_MAX_INTENSITY)) {
     duty = CONFIG_LED_MAX_INTENSITY;
   }
-  ledcWrite(LEDC_CH, duty);
+  ledcWrite(LED_GPIO_NUM, duty);
   //ledc_set_duty(CONFIG_LED_LEDC_SPEED_MODE, CONFIG_LED_LEDC_CHANNEL, duty);
   //ledc_update_duty(CONFIG_LED_LEDC_SPEED_MODE, CONFIG_LED_LEDC_CHANNEL);
   log_i("Set LED intensity to %d", duty);
@@ -110,14 +108,23 @@ void enable_led(bool en) {  // Turn LED On or Off
 #endif
 
 // BUZZER control functions
+int buzzer_freq = 2000;
+
+void set_buzzer_freq(int freq) {
+  if (freq >= 500 && freq <= 5000) {
+    buzzer_freq = freq;
+    ledcAttach(BUZZER_GPIO_NUM, buzzer_freq, 8);
+  }
+}
+
 void enable_buzzer(bool en) {  // Turn Buzzer On or Off
   int duty = en ? buzzer_duty : 0;
   if (en && (buzzer_duty > 255)) {
     duty = 255;
   }
-  ledcWrite(BUZZER_CH, duty);
+  ledcWrite(BUZZER_GPIO_NUM, duty);
   buzzer_active = en;
-  log_i("Set Buzzer %s with duty %d", en ? "ON" : "OFF", duty);
+  log_i("Set Buzzer %s with duty %d, freq %d", en ? "ON" : "OFF", duty, buzzer_freq);
 }
 
 void buzzer_beep(int duration_ms) {  // Make a short beep sound
@@ -471,12 +478,14 @@ static esp_err_t led_handler(httpd_req_t *req) {
 }
 #endif
 
-// BUZZER control endpoint: /buzzer?on=0/1&duty=0..255 or /buzzer?beep=duration_ms
+// BUZZER control endpoint: /buzzer?on=0/1&duty=0..255&freq=500..5000 or /buzzer?beep=duration_ms
 static esp_err_t buzzer_handler(httpd_req_t *req) {
   char *buf = NULL;
   char on_str[8];
   char duty_str[8];
+  char freq_str[8];
   char beep_str[16];
+  char duration_str[16];
 
   if (parse_get(req, &buf) != ESP_OK) {
     return ESP_FAIL;
@@ -484,12 +493,19 @@ static esp_err_t buzzer_handler(httpd_req_t *req) {
 
   bool has_on = httpd_query_key_value(buf, "on", on_str, sizeof(on_str)) == ESP_OK;
   bool has_duty = httpd_query_key_value(buf, "duty", duty_str, sizeof(duty_str)) == ESP_OK;
+  bool has_freq = httpd_query_key_value(buf, "freq", freq_str, sizeof(freq_str)) == ESP_OK;
   bool has_beep = httpd_query_key_value(buf, "beep", beep_str, sizeof(beep_str)) == ESP_OK;
+  bool has_duration = httpd_query_key_value(buf, "duration", duration_str, sizeof(duration_str)) == ESP_OK;
   free(buf);
 
-  if (!has_on && !has_duty && !has_beep) {
+  if (!has_on && !has_duty && !has_freq && !has_beep && !has_duration) {
     httpd_resp_send_404(req);
     return ESP_FAIL;
+  }
+
+  if (has_freq) {
+    int f = atoi(freq_str);
+    set_buzzer_freq(f);
   }
 
   if (has_duty) {
@@ -499,10 +515,10 @@ static esp_err_t buzzer_handler(httpd_req_t *req) {
     buzzer_duty = d;
   }
 
-  if (has_beep) {
-    int duration = atoi(beep_str);
-    if (duration > 0 && duration <= 5000) {  // Max 5 seconds
-      buzzer_beep(duration);
+  if (has_beep || has_duration) {
+    int dur = has_beep ? atoi(beep_str) : atoi(duration_str);
+    if (dur > 0 && dur <= 5000) {  // Max 5 seconds
+      buzzer_beep(dur);
     }
   } else if (has_on) {
     int on_val = atoi(on_str);
@@ -977,21 +993,17 @@ void startCameraServer() {
 }
 
 void setupLedFlash() {
-  const int canalPWM = 0;   // Canal de 0 a 15
   const int frecuencia = 5000;
   const int resolucion = 8; // bits
 
-  ledcSetup(canalPWM, frecuencia, resolucion);
-  ledcAttachPin(LED_GPIO_NUM, canalPWM);
+  ledcAttach(LED_GPIO_NUM, frecuencia, resolucion);
 }
 
 void setupBuzzer() {
-  const int canalPWM = BUZZER_CH;   // Canal de 0 a 15
   const int frecuencia = 2000;      // Frecuencia del buzzer (2kHz)
   const int resolucion = 8;         // bits
 
-  ledcSetup(canalPWM, frecuencia, resolucion);
-  ledcAttachPin(BUZZER_GPIO_NUM, canalPWM);
+  ledcAttach(BUZZER_GPIO_NUM, frecuencia, resolucion);
   buzzer_duty = 128;  // Duty cycle por defecto
 }
 
@@ -1006,7 +1018,7 @@ public:
   void begin() { server.begin(); }
 
   void handle() {
-    WiFiClient client = server.available();
+    WiFiClient client = server.accept();
     if (!client) return;
     client.setNoDelay(true);
     while (client.connected()) {

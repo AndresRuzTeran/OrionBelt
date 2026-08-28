@@ -10,8 +10,8 @@
 #include "app_httpd.h"
 
 // Replace with your network credentials
-const char* ssid = "Brand";  // Cambia por tu SSID
-const char* password = "123456789";  // Cambia por tu contraseña
+const char* ssid = "Audacia";  // Cambia por tu SSID
+const char* password = "R3d4ud4c14?2026*&wl?!";  // Cambia por tu contraseña
 
 void startCameraServer();
 void setupLedFlash();

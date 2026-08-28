@@ -625,6 +625,18 @@
             <span class="slider"></span>
           </label>
         </div>
+
+        <!-- ESP32 Buzzer Toggle -->
+        <div class="toggle-row">
+          <div>
+            <div style="font-weight: 600; font-size: 0.9rem;">Buzzer ESP32</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Alerta sonora en el microcontrolador</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="espBuzzerToggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
       </div>
     </div>
   </main>
@@ -649,6 +661,7 @@
     const nearThreshLabel = document.getElementById('nearThreshLabel');
     const thresholdSlider = document.getElementById('thresholdSlider');
     const localSoundToggle = document.getElementById('localSoundToggle');
+    const espBuzzerToggle = document.getElementById('espBuzzerToggle');
     const statusDot = document.getElementById('statusDot');
     const connectionText = document.getElementById('connectionText');
     const viewButtons = document.querySelectorAll('.view-btn');
@@ -838,6 +851,10 @@
       deviceVal.textContent = (data.device || 'CPU').toUpperCase();
       intensityVal.textContent = `${((data.intensity || 0) * 100).toFixed(0)}%`;
 
+      if (data.esp_buzzer_enabled !== undefined && !espBuzzerToggle._userInteracted) {
+        espBuzzerToggle.checked = Boolean(data.esp_buzzer_enabled);
+      }
+
       // 5. Chart Data
       historyData.push(prox);
       if (historyData.length > MAX_POINTS) historyData.shift();
@@ -861,6 +878,15 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ local_sound_enabled: e.target.checked })
+      });
+    });
+
+    espBuzzerToggle.addEventListener('change', (e) => {
+      espBuzzerToggle._userInteracted = true;
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ esp_buzzer_enabled: e.target.checked })
       });
     });
 
