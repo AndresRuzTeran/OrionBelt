@@ -1,5 +1,9 @@
 # 🌌 ORION | Sistema de Navegación y Detección de Obstáculos
 
+<div align="center">
+  <img src="images/portada.jpeg" alt="ORION - Sistema de Navegación y Detección de Obstáculos" width="100%">
+</div>
+
 > **ORION** es un sistema de visión artificial y navegación asistida en tiempo real basado en estimación de profundidad monocular (**MiDaS**). Procesa video desde cámaras web o módulos **ESP32-CAM** para detectar obstáculos en el corredor de avance, calcular su nivel de proximidad y emitir alertas visuales y sonoras progresivas.
 
 ---
