@@ -8,6 +8,14 @@
 
 ---
 
+## 🎥 Demo
+
+Demostración de **Projection Mapper** en funcionamiento:
+
+[![Projection Mapper - Demo](https://img.youtube.com/vi/UGBBGHXeREA/maxresdefault.jpg)](https://youtu.be/UGBBGHXeREA)
+
+---
+
 ## 🧭 Estructura del Repositorio
 
 Para mantener un proyecto modular, limpio y escalable, el código ha sido organizado separando sus versiones de desarrollo y centralizando la documentación técnica:
