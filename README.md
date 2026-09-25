@@ -167,6 +167,24 @@ Ejecuta [`main_web.py`](main_web.py) para iniciar el servidor web:
 
 ---
 
+### 4. Modo Autónomo XIAO ESP32S3 (Hot-Swap & Rollback a Mac)
+
+Ejecuta [`main_web_xiao.py`](main_web_xiao.py) o el lanzador rápido [`start_xiao.py`](start_xiao.py) para el sistema con conmutación autónoma:
+
+* **Lanzamiento rápido:**
+  ```bash
+  python start_xiao.py
+  ```
+* **Con parámetros personalizados:**
+  ```bash
+  python main_web_xiao.py --xiao-ip 172.16.121.4 --device mps
+  ```
+
+> [!TIP]
+> **Comportamiento Autónomo:** Si el XIAO está apagado o fuera de rango, el sistema arranca y funciona con la cámara web integrada de la Mac. En cuanto el XIAO se enciende y conecta a la red WiFi, el sistema **conmuta en caliente al stream inalámbrico sin reiniciar el servidor**. Si el XIAO se apaga, hace **rollback instantáneo a la Mac**.
+
+---
+
 ## ⚙️ Parámetros de Línea de Comandos (CLI)
 
 | Parámetro | Opciones / Tipo | Por Defecto | Descripción |

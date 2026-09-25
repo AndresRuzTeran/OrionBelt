@@ -1,0 +1,20 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+.venv1/
+venv/
+venv2/
+ENV/
+
+# Runtime cache and volatile data
+.orion_port
+config/known_xiao_ips.json
+
+# Logs & temp files
+*.log
+.DS_Store
+Thumbs.db

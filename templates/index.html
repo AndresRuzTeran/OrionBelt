@@ -23,8 +23,8 @@
       --color-stop: #ef4444;
       --color-stop-glow: rgba(239, 68, 68, 0.45);
       --color-warn: #f59e0b;
-      --font-ui: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Outfit", "Segoe UI", Roboto, sans-serif;
+      --font-mono: "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
     }
 
     * {
@@ -38,39 +38,46 @@
       color: var(--text-main);
       font-family: var(--font-ui);
       min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
     }
 
-    /* Navbar */
+    /* Navbar / Header */
     header {
-      background: rgba(18, 23, 34, 0.85);
-      backdrop-filter: blur(12px);
+      background: rgba(18, 23, 34, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border-subtle);
-      padding: 0.85rem 1.5rem;
+      padding: clamp(0.6rem, 1.2vh, 0.95rem) clamp(1rem, 2.5vw, 2.5rem);
       display: flex;
       align-items: center;
       justify-content: space-between;
       position: sticky;
       top: 0;
       z-index: 50;
+      flex-wrap: wrap;
+      gap: 0.75rem;
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: clamp(0.5rem, 1vw, 0.85rem);
     }
 
     .brand-logo {
-      font-size: 1.6rem;
+      font-size: clamp(1.4rem, 1.8vw, 1.85rem);
       line-height: 1;
     }
 
     .brand-title {
       font-weight: 800;
-      font-size: 1.25rem;
+      font-size: clamp(1.1rem, 1.35vw, 1.45rem);
       letter-spacing: -0.02em;
       background: linear-gradient(135deg, #38bdf8, #818cf8);
       -webkit-background-clip: text;
@@ -78,23 +85,24 @@
     }
 
     .brand-subtitle {
-      font-size: 0.75rem;
+      font-size: clamp(0.68rem, 0.75vw, 0.82rem);
       color: var(--text-muted);
-      font-weight: 500;
-      letter-spacing: 0.05em;
+      font-weight: 600;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
     }
 
     .status-badge {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 0.5rem;
       background: var(--bg-card);
       border: 1px solid var(--border-subtle);
-      padding: 0.35rem 0.8rem;
+      padding: clamp(0.28rem, 0.6vh, 0.45rem) clamp(0.65rem, 1vw, 0.95rem);
       border-radius: 9999px;
       font-family: var(--font-mono);
-      font-size: 0.8rem;
+      font-size: clamp(0.72rem, 0.78vw, 0.85rem);
+      white-space: nowrap;
     }
 
     .status-dot {
@@ -104,6 +112,7 @@
       background: #10b981;
       box-shadow: 0 0 8px #10b981;
       animation: pulse-dot 2s infinite;
+      flex-shrink: 0;
     }
 
     @keyframes pulse-dot {
@@ -111,21 +120,33 @@
       50% { opacity: 0.5; transform: scale(0.85); }
     }
 
-    /* Main Container */
+    /* Main Container (Fluid Responsive Grid) */
     main {
       flex: 1;
-      padding: 1.25rem;
-      max-width: 1600px;
+      padding: clamp(0.75rem, 1.6vw, 2rem);
+      max-width: min(97vw, 2560px);
       margin: 0 auto;
       width: 100%;
       display: grid;
-      grid-template-columns: 1fr 380px;
-      gap: 1.25rem;
+      grid-template-columns: 1fr clamp(340px, 25vw, 480px);
+      gap: clamp(0.85rem, 1.4vw, 1.75rem);
+      align-items: start;
     }
 
+    /* Tablet / Mobile breakpoint */
     @media (max-width: 1100px) {
       main {
         grid-template-columns: 1fr;
+        padding: 0.75rem;
+        gap: 1rem;
+      }
+    }
+
+    /* 2K / 4K / Ultrawide Command Center */
+    @media (min-width: 2200px) {
+      main {
+        grid-template-columns: 1fr 520px;
+        max-width: 2800px;
       }
     }
 
@@ -133,22 +154,23 @@
     .video-section {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: clamp(0.75rem, 1.2vh, 1.25rem);
+      min-width: 0; /* Evita desbordamiento en CSS grid */
     }
 
     .video-card {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      border-radius: 1rem;
+      border-radius: clamp(0.75rem, 1vw, 1.25rem);
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
     }
 
     .video-header {
-      padding: 0.75rem 1.25rem;
-      background: rgba(24, 32, 48, 0.6);
+      padding: clamp(0.6rem, 1vh, 0.85rem) clamp(0.85rem, 1.2vw, 1.4rem);
+      background: rgba(24, 32, 48, 0.65);
       border-bottom: 1px solid var(--border-subtle);
       display: flex;
       align-items: center;
@@ -158,8 +180,8 @@
     }
 
     .video-title {
-      font-weight: 600;
-      font-size: 0.95rem;
+      font-weight: 700;
+      font-size: clamp(0.85rem, 0.95vw, 1.05rem);
       display: flex;
       align-items: center;
       gap: 0.5rem;
@@ -178,8 +200,8 @@
       background: transparent;
       border: none;
       color: var(--text-muted);
-      padding: 0.35rem 0.75rem;
-      font-size: 0.8rem;
+      padding: clamp(0.3rem, 0.6vh, 0.45rem) clamp(0.6rem, 0.8vw, 0.95rem);
+      font-size: clamp(0.75rem, 0.8vw, 0.88rem);
       font-weight: 600;
       border-radius: 0.35rem;
       cursor: pointer;
@@ -194,7 +216,7 @@
     .view-btn.active {
       background: var(--border-focus);
       color: #ffffff;
-      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.45);
     }
 
     .video-wrapper {
@@ -204,46 +226,50 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 380px;
+      min-height: clamp(260px, 38vh, 620px);
+      max-height: clamp(360px, 56vh, 760px);
+      overflow: hidden;
     }
 
     .video-feed {
       width: 100%;
-      height: auto;
-      display: block;
+      height: 100%;
+      max-height: clamp(360px, 56vh, 760px);
       object-fit: contain;
-      max-height: 65vh;
+      display: block;
     }
 
     /* Action Banner Overlay */
     .action-overlay {
       position: absolute;
-      top: 1rem;
-      left: 1rem;
-      padding: 0.5rem 1.25rem;
+      top: clamp(0.75rem, 1.2vh, 1.25rem);
+      left: clamp(0.75rem, 1.2vw, 1.25rem);
+      padding: clamp(0.4rem, 0.8vh, 0.65rem) clamp(0.9rem, 1.2vw, 1.4rem);
       border-radius: 0.6rem;
       font-weight: 800;
-      font-size: 1.1rem;
+      font-size: clamp(0.95rem, 1.1vw, 1.25rem);
       letter-spacing: 0.08em;
       text-transform: uppercase;
       font-family: var(--font-mono);
-      backdrop-filter: blur(8px);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       display: flex;
       align-items: center;
       gap: 0.6rem;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+      z-index: 10;
     }
 
     .action-overlay.FORWARD {
-      background: rgba(16, 185, 129, 0.85);
+      background: rgba(16, 185, 129, 0.88);
       color: #ffffff;
       border: 1px solid #10b981;
       box-shadow: 0 0 20px var(--color-fwd-glow);
     }
 
     .action-overlay.STOP {
-      background: rgba(239, 68, 68, 0.9);
+      background: rgba(239, 68, 68, 0.92);
       color: #ffffff;
       border: 1px solid #ef4444;
       box-shadow: 0 0 25px var(--color-stop-glow);
@@ -255,26 +281,28 @@
       100% { transform: scale(1.04); filter: brightness(1.2); }
     }
 
-    /* Live Telemetry Graph */
+    /* Live Telemetry Graph Card */
     .graph-card {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      border-radius: 1rem;
-      padding: 1.25rem;
+      border-radius: clamp(0.75rem, 1vw, 1.25rem);
+      padding: clamp(0.85rem, 1.2vw, 1.35rem);
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.65rem;
     }
 
     .graph-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.4rem;
     }
 
     .graph-title {
-      font-size: 0.9rem;
-      font-weight: 600;
+      font-size: clamp(0.78rem, 0.85vw, 0.95rem);
+      font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -283,7 +311,7 @@
     .canvas-container {
       position: relative;
       width: 100%;
-      height: 120px;
+      height: clamp(95px, 13vh, 160px);
     }
 
     #telemetryCanvas {
@@ -292,25 +320,27 @@
       display: block;
     }
 
-    /* Sidebar / Dashboard */
+    /* Sidebar / Dashboard Controls */
     .sidebar {
       display: flex;
       flex-direction: column;
-      gap: 1.25rem;
+      gap: clamp(0.85rem, 1.4vh, 1.4rem);
+      min-width: 0;
     }
 
     .card {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      border-radius: 1rem;
-      padding: 1.25rem;
+      border-radius: clamp(0.75rem, 1vw, 1.25rem);
+      padding: clamp(0.95rem, 1.3vw, 1.5rem);
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: clamp(0.75rem, 1.1vh, 1.2rem);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
     }
 
     .card-title {
-      font-size: 0.9rem;
+      font-size: clamp(0.8rem, 0.85vw, 0.95rem);
       font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
@@ -320,33 +350,34 @@
       gap: 0.5rem;
     }
 
-    /* Proximity Meter */
+    /* Proximity Meter Display */
     .proximity-display {
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
+      gap: 0.5rem;
       align-items: center;
       text-align: center;
-      padding: 0.5rem 0;
+      padding: 0.35rem 0;
     }
 
     .proximity-value {
-      font-size: 3rem;
+      font-size: clamp(2.4rem, 3.4vw, 4rem);
       font-weight: 800;
       font-family: var(--font-mono);
       line-height: 1;
       transition: color 0.3s;
+      letter-spacing: -0.02em;
     }
 
     .proximity-label {
-      font-size: 0.85rem;
+      font-size: clamp(0.78rem, 0.82vw, 0.9rem);
       color: var(--text-muted);
       font-weight: 500;
     }
 
     .meter-bar-container {
       width: 100%;
-      height: 14px;
+      height: clamp(12px, 1.5vh, 16px);
       background: #0f131c;
       border-radius: 9999px;
       overflow: hidden;
@@ -372,31 +403,41 @@
       transform: translateX(-50%);
     }
 
-    /* Telemetry Grid */
+    /* Telemetry Metric Grid */
     .telemetry-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
+      gap: clamp(0.5rem, 0.75vw, 0.85rem);
+    }
+
+    /* 3 columnas de métricas en pantallas muy anchas */
+    @media (min-width: 1750px) {
+      .telemetry-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
     }
 
     .metric-box {
       background: var(--bg-card);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.75rem;
-      padding: 0.75rem;
+      border-radius: clamp(0.55rem, 0.7vw, 0.85rem);
+      padding: clamp(0.6rem, 0.85vw, 0.95rem);
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
     }
 
     .metric-label {
-      font-size: 0.75rem;
+      font-size: clamp(0.7rem, 0.75vw, 0.82rem);
       color: var(--text-muted);
       font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .metric-val {
-      font-size: 1.15rem;
+      font-size: clamp(1.05rem, 1.25vw, 1.45rem);
       font-weight: 700;
       font-family: var(--font-mono);
       color: var(--text-main);
@@ -412,7 +453,7 @@
     .control-label {
       display: flex;
       justify-content: space-between;
-      font-size: 0.85rem;
+      font-size: clamp(0.8rem, 0.85vw, 0.92rem);
       font-weight: 600;
       color: var(--text-main);
     }
@@ -450,7 +491,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.5rem 0;
+      padding: clamp(0.4rem, 0.8vh, 0.65rem) 0;
       border-top: 1px solid var(--border-subtle);
     }
 
@@ -459,6 +500,7 @@
       display: inline-block;
       width: 44px;
       height: 24px;
+      flex-shrink: 0;
     }
 
     .switch input {
@@ -499,11 +541,50 @@
       background-color: #ffffff;
     }
 
+    /* Laptop Screen Optimization: Viewport-Fit (No vertical scroll on laptops) */
+    @media (max-height: 860px) and (min-width: 1101px) {
+      header {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+      }
+      main {
+        padding-top: 0.65rem;
+        padding-bottom: 0.65rem;
+        gap: 0.85rem;
+      }
+      .video-wrapper {
+        min-height: 220px;
+        max-height: 46vh;
+      }
+      .video-feed {
+        max-height: 46vh;
+      }
+      .canvas-container {
+        height: 85px;
+      }
+      .card {
+        padding: 0.85rem;
+        gap: 0.65rem;
+      }
+      .proximity-value {
+        font-size: 2.2rem;
+      }
+      .proximity-display {
+        padding: 0.15rem 0;
+      }
+      .metric-box {
+        padding: 0.5rem;
+      }
+      footer {
+        padding: 0.5rem 1rem;
+      }
+    }
+
     /* Footer */
     footer {
-      padding: 1rem 1.5rem;
+      padding: clamp(0.6rem, 1vh, 0.9rem) 1.5rem;
       text-align: center;
-      font-size: 0.8rem;
+      font-size: clamp(0.72rem, 0.76vw, 0.82rem);
       color: var(--text-muted);
       border-top: 1px solid var(--border-subtle);
       background: var(--bg-surface);
@@ -520,9 +601,15 @@
         <div class="brand-subtitle">By AudacIA</div>
       </div>
     </div>
-    <div class="status-badge">
-      <span class="status-dot" id="statusDot"></span>
-      <span id="connectionText">EN LÍNEA</span>
+    <div style="display: flex; gap: 0.75rem; align-items: center;">
+      <div class="status-badge" id="cameraBadge" style="background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.35);">
+        <span class="status-dot" id="cameraDot" style="background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
+        <span id="cameraText" style="color: #10b981; font-weight: 600; font-size: 0.75rem;">XIAO ESP32S3</span>
+      </div>
+      <div class="status-badge">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="connectionText">EN LÍNEA</span>
+      </div>
     </div>
   </header>
 
@@ -579,8 +666,12 @@
 
         <div class="telemetry-grid">
           <div class="metric-box">
-            <div class="metric-label">FPS Inferencia</div>
-            <div class="metric-val" id="fpsVal">--</div>
+            <div class="metric-label">FPS Visual</div>
+            <div class="metric-val" id="fpsVal" style="color: var(--accent-blue);">--</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">FPS IA</div>
+            <div class="metric-val" id="aiFpsVal" style="color: var(--color-fwd);">--</div>
           </div>
           <div class="metric-box">
             <div class="metric-label">Aceleración</div>
@@ -593,6 +684,10 @@
           <div class="metric-box">
             <div class="metric-label">Intensidad</div>
             <div class="metric-val" id="intensityVal">0%</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Cámara Activa</div>
+            <div class="metric-val" id="activeCamVal" style="font-size: 0.95rem;">--</div>
           </div>
         </div>
       </div>
@@ -636,6 +731,22 @@
             <input type="checkbox" id="espBuzzerToggle" checked>
             <span class="slider"></span>
           </label>
+        </div>
+
+        <!-- Selector de Fuente de Cámara -->
+        <div class="control-group" style="border-top: 1px solid var(--border-subtle); padding-top: 0.85rem; margin-top: 0.5rem;">
+          <div class="control-label" style="margin-bottom: 0.35rem;">
+            <span>Fuente de Video</span>
+            <span id="camModeLabel" style="font-size: 0.75rem; color: var(--accent-blue);">Auto</span>
+          </div>
+          <div style="display: flex; gap: 6px; background: var(--bg-card); padding: 4px; border-radius: 0.5rem; border: 1px solid var(--border-subtle);">
+            <button class="cam-mode-btn active" data-cam-mode="auto" id="btnModeAuto" style="flex: 1; padding: 0.45rem 0.4rem; font-size: 0.8rem; border: none; border-radius: 0.35rem; cursor: pointer; font-weight: 600; background: var(--border-focus); color: #fff; transition: all 0.2s;">⚡ Auto</button>
+            <button class="cam-mode-btn" data-cam-mode="local" id="btnModeLocal" style="flex: 1; padding: 0.45rem 0.4rem; font-size: 0.8rem; border: none; border-radius: 0.35rem; cursor: pointer; font-weight: 600; background: transparent; color: var(--text-muted); transition: all 0.2s;">💻 PC</button>
+            <button class="cam-mode-btn" data-cam-mode="xiao" id="btnModeXiao" style="flex: 1; padding: 0.45rem 0.4rem; font-size: 0.8rem; border: none; border-radius: 0.35rem; cursor: pointer; font-weight: 600; background: transparent; color: var(--text-muted); transition: all 0.2s;">📡 XIAO</button>
+          </div>
+          <div id="camModeHint" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.35rem; line-height: 1.3;">
+            ⚡ <b>Auto:</b> Prioriza XIAO y conmuta a la cámara del PC si se interrumpe.
+          </div>
         </div>
       </div>
     </div>
@@ -848,11 +959,75 @@
 
       // 4. Metrics
       fpsVal.textContent = (data.fps || 0).toFixed(1);
+      const aiFpsEl = document.getElementById('aiFpsVal');
+      if (aiFpsEl) {
+        aiFpsEl.textContent = (data.ai_fps || 0).toFixed(1);
+      }
       deviceVal.textContent = (data.device || 'CPU').toUpperCase();
       intensityVal.textContent = `${((data.intensity || 0) * 100).toFixed(0)}%`;
 
+      const activeCamEl = document.getElementById('activeCamVal');
+      if (activeCamEl && data.camera_source) {
+        if (data.camera_source === 'XIAO_ESP32S3') {
+          activeCamEl.textContent = '📡 XIAO';
+          activeCamEl.style.color = '#10b981';
+        } else if (data.camera_source === 'XIAO_ESP32S3_CONNECTING') {
+          activeCamEl.textContent = '🔍 BUSCANDO';
+          activeCamEl.style.color = '#06b6d4';
+        } else if (data.camera_mode === 'local') {
+          activeCamEl.textContent = '💻 PC (Fijo)';
+          activeCamEl.style.color = '#38bdf8';
+        } else {
+          activeCamEl.textContent = '🟡 PC (Auto)';
+          activeCamEl.style.color = '#f59e0b';
+        }
+      }
+
       if (data.esp_buzzer_enabled !== undefined && !espBuzzerToggle._userInteracted) {
         espBuzzerToggle.checked = Boolean(data.esp_buzzer_enabled);
+      }
+
+      // Camera Source Badge Sync
+      if (data.camera_source) {
+        const camText = document.getElementById('cameraText');
+        const camDot = document.getElementById('cameraDot');
+        const camBadge = document.getElementById('cameraBadge');
+        if (camText && camDot && camBadge) {
+          if (data.camera_source === 'XIAO_ESP32S3') {
+            camText.textContent = `XIAO ESP32S3 (${data.camera_ip || '172.16.121.4'})`;
+            camText.style.color = '#10b981';
+            camDot.style.background = '#10b981';
+            camDot.style.boxShadow = '0 0 8px #10b981';
+            camBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+            camBadge.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+          } else if (data.camera_source === 'XIAO_ESP32S3_CONNECTING') {
+            camText.textContent = '🔍 BUSCANDO XIAO ESP32S3 (172.16.121.4)...';
+            camText.style.color = '#06b6d4';
+            camDot.style.background = '#06b6d4';
+            camDot.style.boxShadow = '0 0 8px #06b6d4';
+            camBadge.style.background = 'rgba(6, 182, 212, 0.12)';
+            camBadge.style.borderColor = 'rgba(6, 182, 212, 0.35)';
+          } else if (data.camera_mode === 'local') {
+            camText.textContent = '💻 CÁMARA LOCAL (Forzada)';
+            camText.style.color = '#38bdf8';
+            camDot.style.background = '#38bdf8';
+            camDot.style.boxShadow = '0 0 8px #38bdf8';
+            camBadge.style.background = 'rgba(56, 189, 248, 0.12)';
+            camBadge.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+          } else {
+            camText.textContent = '🟡 CÁMARA LOCAL (Rollback Auto)';
+            camText.style.color = '#f59e0b';
+            camDot.style.background = '#f59e0b';
+            camDot.style.boxShadow = '0 0 8px #f59e0b';
+            camBadge.style.background = 'rgba(245, 158, 11, 0.12)';
+            camBadge.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+          }
+        }
+      }
+
+      // Sync active camera mode button
+      if (data.camera_mode && !window._camModeUserClicking) {
+        setCamModeUI(data.camera_mode);
       }
 
       // 5. Chart Data
@@ -861,6 +1036,48 @@
       drawChart();
 
     }
+
+    // Camera Mode Switcher Handlers
+    const camModeBtns = document.querySelectorAll('.cam-mode-btn');
+    const camModeLabel = document.getElementById('camModeLabel');
+    const camModeHint = document.getElementById('camModeHint');
+
+    const modeHints = {
+      auto: '⚡ <b>Auto:</b> Prioriza XIAO y conmuta a la cámara del PC si se interrumpe.',
+      local: '💻 <b>PC:</b> Forzado exclusivamente a la cámara de la computadora.',
+      xiao: '📡 <b>XIAO:</b> Prioriza XIAO y busca activamente la conexión (PC temporal si está apagado).'
+    };
+
+    function setCamModeUI(mode) {
+      camModeBtns.forEach(b => {
+        if (b.dataset.camMode === mode) {
+          b.style.background = 'var(--border-focus)';
+          b.style.color = '#fff';
+          b.classList.add('active');
+        } else {
+          b.style.background = 'transparent';
+          b.style.color = 'var(--text-muted)';
+          b.classList.remove('active');
+        }
+      });
+      if (camModeLabel) camModeLabel.textContent = mode.toUpperCase();
+      if (camModeHint && modeHints[mode]) camModeHint.innerHTML = modeHints[mode];
+    }
+
+    camModeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.camMode;
+        window._camModeUserClicking = true;
+        setCamModeUI(mode);
+        fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ camera_mode: mode })
+        }).finally(() => {
+          setTimeout(() => { window._camModeUserClicking = false; }, 1200);
+        });
+      });
+    });
 
     // Sliders & Controls handlers
     thresholdSlider.addEventListener('input', (e) => {

@@ -1,0 +1,11 @@
+# Dependencias optimizadas para Mac (Apple Silicon M1/M2/M3/M4 & Intel)
+torch
+torchvision
+opencv-python
+fastapi
+uvicorn
+websockets
+requests
+pillow
+numpy
+timm

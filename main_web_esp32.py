@@ -1198,7 +1198,7 @@ async def websocket_telemetry(websocket: WebSocket):
             data = engine.get_telemetry()
             await websocket.send_json(data)
             await asyncio.sleep(0.04)  # ~25 Hz telemetry updates
-    except (WebSocketDisconnect, asyncio.CancelledError, ConnectionResetError, OSError):
+    except (WebSocketDisconnect, RuntimeError, asyncio.CancelledError, ConnectionResetError, OSError):
         pass
 
 
