@@ -1,10 +1,12 @@
 # 🌌 ORION | Optical Recognition & Intelligent Obstacle Navigation
 
+**ORION** es un sistema de visión artificial y navegación asistida en tiempo real basado en estimación de profundidad monocular (**MiDaS**). Procesa flujos de video inalámbricos de alta velocidad (30 FPS) desde microcontroladores **Seeed Studio XIAO ESP32S3 Sense**, detecta obstáculos en el corredor de avance, calcula su proximidad relativa y emite alertas visuales y acústicas progresivas con tolerancia a fallos mediante conmutación en caliente (*Hot-Swap*).
+
+
+
 <div align="center">
   <img src="images/portada.jpeg" alt="ORION - Sistema de Navegación y Detección de Obstáculos" width="100%">
 </div>
-
-> **ORION** es un sistema de visión artificial y navegación asistida en tiempo real basado en estimación de profundidad monocular (**MiDaS**). Procesa flujos de video inalámbricos de alta velocidad (30 FPS) desde microcontroladores **Seeed Studio XIAO ESP32S3 Sense**, detecta obstáculos en el corredor de avance, calcula su proximidad relativa y emite alertas visuales y acústicas progresivas con tolerancia a fallos mediante conmutación en caliente (*Hot-Swap*).
 
 ---
 
