@@ -6,14 +6,16 @@ Script de inicio rápido que encuentra automáticamente el ESP32-CAM y ejecuta e
 import subprocess
 import sys
 import os
+from pathlib import Path
 
 def main():
     print("🚀 Iniciando sistema de detección de obstáculos...")
     print("=" * 50)
     
     # Ejecutar el script principal con detección automática
+    script_path = str(Path(__file__).resolve().parent / "main.py")
     cmd = [
-        sys.executable, "main_web_esp32.py",
+        sys.executable, script_path,
         "--auto-find",
         "--no-local-sound"
     ]

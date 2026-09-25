@@ -6,6 +6,7 @@ Script de inicio rápido para ORION con XIAO ESP32S3 Sense y Hot-Swap/Rollback a
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 # Asegurar compatibilidad UTF-8 en terminales Windows
 if sys.platform == "win32":
@@ -27,9 +28,9 @@ def main():
     print("   Abre únicamente el Dashboard web de ORION (http://localhost:8000).")
     print("=" * 65)
     
-    device = "mps" if sys.platform == "darwin" else "auto"
+    script_path = str(Path(__file__).resolve().parent / "main.py")
     cmd = [
-        sys.executable, "main_web_xiao.py",
+        sys.executable, script_path,
         "--device", device,
     ] + sys.argv[1:]
     

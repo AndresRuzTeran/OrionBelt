@@ -16,6 +16,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlparse
 
+# Resolver ruta raíz del proyecto ORION
+PROJECT_ROOT = Path(__file__).resolve().parents[2] if Path(__file__).resolve().parent.parent.name == "versions" else Path(__file__).resolve().parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 # Debe fijarse ANTES de que MiDaS ejecute cualquier operación en MPS.
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
@@ -347,13 +352,20 @@ class AlarmManager:
                 interval = self.local_sound.interval_for_level(level)
                 self.local_sound.play(level)
             else:
-                interval = 0.55 - 0.40 * intensity
+                interval = 0.50 - 0.38 * intensity
 
             if self.esp is not None and self.esp_buzzer_enabled:
-                duty = int(self.buzzer_duty_max * (0.4 + 0.6 * intensity))
-                self.esp.pulse_buzzer(duty, self.buzzer_duration_ms)
+                # Modulación progresiva con la intensidad (0.0 a 1.0)
+                # 1. Volumen / Duty: de 100 (suave) a 255 (máximo)
+                duty = int(100 + 155 * intensity)
+                # 2. Duración del Beep: de 180ms (lejano) a 60ms (crítico/muy cerca)
+                beep_dur = int(180 - 120 * intensity)
+                # 3. Tono / Frecuencia: de 800 Hz (lejano) a 3000 Hz (muy cerca)
+                freq = int(800 + 2200 * intensity)
+                
+                self.esp.pulse_buzzer(duty, beep_dur, freq=freq)
 
-            time.sleep(max(0.05, interval))
+            time.sleep(max(0.04, interval))
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -655,22 +667,63 @@ class RawLenSocketReader:
 # Network / ESP32
 # ---------------------------------------------------------------------------
 
-def get_local_ip() -> str:
+def get_all_local_ips() -> list[str]:
+    ips = set()
     try:
+        # Obtener IP vía socket activo
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("8.8.8.8", 80))
-            return s.getsockname()[0]
+            ips.add(s.getsockname()[0])
     except OSError:
-        return "127.0.0.1"
+        pass
+
+    try:
+        # Obtener IPs del hostname del sistema
+        hostname = socket.gethostname()
+        for ip in socket.gethostbyname_ex(hostname)[2]:
+            if not ip.startswith("127."):
+                ips.add(ip)
+    except Exception:
+        pass
+
+    return list(ips) if ips else ["127.0.0.1"]
 
 
-def get_network_range():
-    local_ip = get_local_ip()
-    network = ipaddress.IPv4Network(f"{local_ip}/24", strict=False)
-    return [str(ip) for ip in network.hosts()]
+def get_local_ip() -> str:
+    ips = get_all_local_ips()
+    return ips[0]
 
 
-def check_esp32_port(ip: str, port: int = 81, timeout: float = 0.35) -> bool:
+def get_expanded_network_range() -> list[str]:
+    local_ips = get_all_local_ips()
+    target_ips = set()
+
+    # Subredes conocidas probables para el ESP32 en el entorno del usuario
+    known_subnets = [121, 125, 126, 1, 0, 100]
+
+    for ip_str in local_ips:
+        try:
+            parts = [int(p) for p in ip_str.split(".")]
+            if len(parts) == 4:
+                prefix = f"{parts[0]}.{parts[1]}"
+                
+                # Agregar la subred /24 actual de la IP del equipo
+                net = ipaddress.IPv4Network(f"{ip_str}/24", strict=False)
+                for host_ip in net.hosts():
+                    target_ips.add(str(host_ip))
+
+                # Si es una red privada (172.16-31.X.X o 192.168.X.X), agregar subredes comunes del mismo bloque
+                for sub in known_subnets:
+                    if sub != parts[2]:
+                        for last_octet in range(1, 255):
+                            target_ips.add(f"{prefix}.{sub}.{last_octet}")
+        except Exception:
+            pass
+
+    return list(target_ips)
+
+
+def check_esp32_port(ip: str, port: int = 81, timeout: float = 0.3) -> bool:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(timeout)
@@ -679,7 +732,7 @@ def check_esp32_port(ip: str, port: int = 81, timeout: float = 0.35) -> bool:
         return False
 
 
-def check_esp32_stream(ip: str, timeout: float = 2.0) -> bool:
+def check_esp32_stream(ip: str, timeout: float = 1.0) -> bool:
     try:
         response = requests.get(
             f"http://{ip}:81/stream",
@@ -687,8 +740,11 @@ def check_esp32_stream(ip: str, timeout: float = 2.0) -> bool:
             stream=True,
         )
         if response.status_code == 200:
+            content_type = response.headers.get("Content-Type", "")
             response.close()
-            return True
+            # El stream del ESP32-CAM es estrictamente multipart/x-mixed-replace
+            if "multipart/x-mixed-replace" in content_type:
+                return True
     except requests.RequestException:
         pass
     return False
@@ -696,46 +752,50 @@ def check_esp32_stream(ip: str, timeout: float = 2.0) -> bool:
 
 def check_esp32_control(ip: str, timeout: float = 1.0) -> bool:
     try:
-        response = requests.get(f"http://{ip}/control", timeout=timeout)
-        return response.status_code == 200
+        # Petición a /status: el ESP32-CAM devuelve un JSON con claves exclusivas como framesize o xclk
+        response = requests.get(f"http://{ip}/status", timeout=timeout)
+        if response.status_code == 200 and "application/json" in response.headers.get("Content-Type", ""):
+            data = response.json()
+            if isinstance(data, dict) and ("framesize" in data or "xclk" in data or "quality" in data):
+                return True
+    except (requests.RequestException, ValueError, Exception):
+        pass
+
+    try:
+        # Fallback de verificación rápida a /control
+        response = requests.get(f"http://{ip}/control?var=framesize&val=6", timeout=timeout)
+        if response.status_code == 200 and response.headers.get("Access-Control-Allow-Origin") == "*":
+            return True
     except requests.RequestException:
-        return False
+        pass
+
+    return False
 
 
 def auto_find_esp32() -> str | None:
-    print("🔍 Escaneando red local en busca de ESP32-CAM...")
-    known_ips = [
-        "10.35.132.231",
-        "172.16.121.9",
-        "192.168.1.100",
-        "192.168.0.100",
-        "192.168.1.1",
-    ]
+    local_ips = get_all_local_ips()
+    print(f"🔍 Escaneando subredes locales (IPs detectadas en equipo: {', '.join(local_ips)})...")
 
-    for ip in known_ips:
-        if check_esp32_port(ip, 81):
-            if check_esp32_stream(ip) or check_esp32_control(ip):
-                print(f"🎉 ESP32-CAM encontrado en {ip}")
-                return ip
+    network_ips = get_expanded_network_range()
+    print(f"⚡ Escaneando {len(network_ips)} direcciones IP en paralelo...")
 
-    network_ips = get_network_range()
-    with ThreadPoolExecutor(max_workers=32) as executor:
-        futures = {
-            executor.submit(check_esp32_port, ip, 81, 0.35): ip
-            for ip in network_ips
-        }
+    def probe_ip(ip: str) -> bool:
+        if check_esp32_port(ip, 81, 0.25) or check_esp32_port(ip, 80, 0.25):
+            return check_esp32_stream(ip) or check_esp32_control(ip)
+        return False
 
-        candidates = []
+    with ThreadPoolExecutor(max_workers=128) as executor:
+        futures = {executor.submit(probe_ip, ip): ip for ip in network_ips}
         for future in as_completed(futures):
-            if future.result():
-                candidates.append(futures[future])
+            ip = futures[future]
+            try:
+                if future.result():
+                    print(f"🎯 ESP32-CAM encontrado exitosamente en: {ip}")
+                    return ip
+            except Exception:
+                pass
 
-    for ip in candidates:
-        if check_esp32_stream(ip) or check_esp32_control(ip):
-            print(f"🎯 ESP32-CAM encontrado: {ip}")
-            return ip
-
-    print("❌ No se encontró ningún ESP32-CAM")
+    print("❌ No se encontró ningún ESP32-CAM en las subredes escaneadas.")
     return None
 
 
@@ -783,16 +843,18 @@ class EspController:
             timeout=(0.15, 0.5),
         )
 
-    def pulse_buzzer(self, duty: int, duration_ms: int = 150):
+    def pulse_buzzer(self, duty: int, duration_ms: int = 150, freq: int | None = None):
         if not self.base_url:
             return
         duty = max(0, min(255, int(duty)))
         with self.lock:
             self.last_buzzer_state = True
-        self.request(
-            f"/buzzer?on=1&duty={duty}&duration={max(0, int(duration_ms))}",
-            timeout=(0.15, 0.5),
-        )
+        
+        url = f"/buzzer?duty={duty}&beep={max(0, int(duration_ms))}"
+        if freq is not None:
+            url += f"&freq={int(freq)}"
+            
+        self.request(url, timeout=(0.15, 0.5))
 
     def close(self):
         try:
@@ -1067,6 +1129,7 @@ class OrionEngine:
                 "frame_count": self.frame_count,
                 "local_sound": self.local_sound.enabled,
                 "esp_buzzer": self.alarm.esp_buzzer_enabled,
+                "esp_buzzer_enabled": self.alarm.esp_buzzer_enabled,
                 "timestamp": time.time(),
             }
 
@@ -1103,8 +1166,12 @@ server_instance: uvicorn.Server | None = None
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard():
-    template_path = Path(__file__).parent / "templates" / "index.html"
-    if template_path.exists():
+    template_candidates = [
+        Path(__file__).parent / "templates" / "index.html",
+        PROJECT_ROOT / "templates" / "index.html",
+    ]
+    template_path = next((p for p in template_candidates if p.exists()), None)
+    if template_path and template_path.exists():
         return HTMLResponse(template_path.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>ORION Web Dashboard</h1><p>templates/index.html no encontrado</p>")
 
@@ -1252,15 +1319,6 @@ def main():
 
     if chosen_port != args.port:
         print(f"⚠️ El puerto {args.port} está reservado u ocupado en tu sistema. Usando puerto alternativo libre: {chosen_port}")
-
-    # Guardar el puerto elegido para que el script de inicio
-    # pueda abrir automáticamente el navegador en la URL correcta.
-    port_file = Path(__file__).parent / ".orion_port"
-
-    try:
-        port_file.write_text(str(chosen_port), encoding="utf-8")
-    except OSError as exc:
-        print(f"⚠️ No se pudo guardar el puerto de ORION: {exc}")
 
     print("\n" + "=" * 60)
     print("🌌 ORION Web Dashboard iniciado exitosamente!")

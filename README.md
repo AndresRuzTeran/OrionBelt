@@ -1,214 +1,136 @@
-# 🌌 ORION | Sistema de Navegación y Detección de Obstáculos
+# 🌌 ORION | Optical Recognition & Intelligent Obstacle Navigation
 
 <div align="center">
   <img src="images/portada.jpeg" alt="ORION - Sistema de Navegación y Detección de Obstáculos" width="100%">
 </div>
 
-> **ORION** es un sistema de visión artificial y navegación asistida en tiempo real basado en estimación de profundidad monocular (**MiDaS**). Procesa video desde cámaras web o módulos **ESP32-CAM** para detectar obstáculos en el corredor de avance, calcular su nivel de proximidad y emitir alertas visuales y sonoras progresivas.
+> **ORION** es un sistema de visión artificial y navegación asistida en tiempo real basado en estimación de profundidad monocular (**MiDaS**). Procesa flujos de video inalámbricos de alta velocidad (30 FPS) desde microcontroladores **Seeed Studio XIAO ESP32S3 Sense**, detecta obstáculos en el corredor de avance, calcula su proximidad relativa y emite alertas visuales y acústicas progresivas con tolerancia a fallos mediante conmutación en caliente (*Hot-Swap*).
 
 ---
 
-## 📋 Tabla de Contenidos
+## 🧭 Estructura del Repositorio
 
-- [Visión General](#-visión-general)
-- [Comparativa: `main.py` (Original) vs `main-prueba.py` (Optimizado)](#-comparativa-mainpy-original-vs-main-pruebapy-optimizado)
-- [Nueva Funcionalidad: `main_web.py` (Dashboard Web)](#-nueva-funcionalidad-main_webpy-dashboard-web)
-- [Métrica de Medición y Distancia de Activación](#-métrica-de-medición-y-distancia-de-activación)
-- [Guía de Usuario e Instalación](#-guía-de-usuario-e-instalación)
-  - [1. Instalación](#1-instalación)
-  - [2. Modo Escritorio (Ventana OpenCV)](#2-modo-escritorio-ventana-opencv)
-  - [3. Modo Servicio Web (Dashboard HTML5)](#3-modo-servicio-web-dashboard-html5)
-- [Parámetros de Línea de Comandos (CLI)](#-parámetros-de-línea-de-comandos-cli)
-- [Herramientas Auxiliares](#-herramientas-auxiliares)
+Para mantener un proyecto modular, limpio y escalable, el código ha sido organizado separando sus versiones de desarrollo y centralizando la documentación técnica:
 
----
-
-## 🔭 Visión General
-
-ORION analiza el flujo de video en tiempo real, ejecuta la red neuronal **MiDaS** para generar un mapa de disparidad relativa y evalúa el tercio central de la escena:
-- **`FORWARD`**: Corredor de avance despejado.
-- **`STOP`**: Obstáculo detectado por encima del umbral de cercanía (por defecto $\ge 60\%$).
-- **Alertas Progresivas**: Emisión de beeps sonoros que aumentan en tono, volumen y cadencia a medida que el obstáculo se acerca.
-
----
-
-## ⚡ Comparativa: `main.py` (Original) vs `main-prueba.py` (Optimizado)
-
-El archivo [`main.py`](main.py) fue la versión inicial del proyecto. El archivo [`main-prueba.py`](main-prueba.py) introduce optimizaciones críticas de rendimiento, audio y visualización:
-
-### 1. Aceleración de Hardware Multiplataforma
-- **Original (`main.py`):** Solo soportaba CUDA (Nvidia). En Mac corría forzosamente en CPU a ~3-5 FPS.
-- **Optimizado (`main-prueba.py`):**
-  - **Apple Silicon (MPS):** Usa la GPU integrada de Mac (M1/M2/M3/M4) alcanzando **20-30+ FPS**, con fallback automático ante operaciones no soportadas (`PYTORCH_ENABLE_MPS_FALLBACK`).
-  - **Windows / Linux:** Soporte completo para **CUDA (Nvidia)** y CPU.
-  - **Cámara:** Backend nativo `AVFoundation` en macOS y `DirectShow/MSMF` en Windows.
-
-### 2. Pipeline de Inferencia Rápido
-- **`@torch.inference_mode()`**: Elimina la sobrecarga de seguimiento de tensores.
-- **Interpolación Bilineal**: Reemplaza `bicubic` por `bilinear`, mucho más rápida en GPU/MPS.
-- **Resolución Balanceada (`--proc-width 320`)**: Triplica la velocidad de inferencia manteniendo precisión en la detección de obstáculos.
-- **Suavizado Temporal In-Place**: Reduce consumo de memoria y micro-tirones.
-
-### 3. Sistema de Alarma Multinivel Multihilo
-- **Hilo Independiente (`AlarmManager`)**: La alarma acústica no se traba ni depende de los FPS del video.
-- **4 Niveles de Urgencia (`LocalAlarmSound`)**: Genera tonos senoidales puros (700 Hz a 1500 Hz) que escalan según la cercanía.
-- **Soporte Nativo en Mac**: Utiliza `/usr/bin/afplay` sin necesidad de instalar librerías externas de audio.
-
-### 4. Captura Asíncrona y UI Compacta
-- **`LatestFrameReader` activo por defecto**: Descarta cuadros viejos en buffer para eliminar el retraso acumulado del video.
-- **HUD Compacto**: Letras de acción con tamaño optimizado y legible, indicador numérico de proximidad en porcentaje (`Prox: XX.X%`) y barra gráfica de seguridad.
-
-| Característica | `main.py` (Original) | `main-prueba.py` (Optimizado) |
-| :--- | :--- | :--- |
-| **Aceleración Hardware** | Solo CUDA o CPU lenta | **Apple Silicon (MPS)**, CUDA y CPU |
-| **FPS Típicos (Mac M1/M2)** | ~3 - 5 FPS | **20 - 30+ FPS** |
-| **Modo PyTorch** | `torch.no_grad()` | `@torch.inference_mode()` |
-| **Alarma Sonora en PC/Mac** | ❌ No | ✅ **Sí, 4 niveles progresivos (700Hz - 1500Hz)** |
-| **Arquitectura de Audio** | Síncrona (se corta si hay lag) | **Multihilo (`AlarmManager`), sonido continuo** |
-| **Latencia de Video** | Acumulativa en buffer | **Mínima (descarte de frames obsoletos)** |
-| **Visualización en Pantalla** | Texto grande sin telemetría | **Texto compacto + Medidor de Proximidad %** |
-
----
-
-## 🌐 Nueva Funcionalidad: `main_web.py` (Dashboard Web)
-
-[`main_web.py`](main_web.py) sustituye la ventana de escritorio de OpenCV por un **Servicio Web interactivo en tiempo real** desarrollado con **FastAPI + Uvicorn + WebSockets** y un panel en **HTML5/CSS3/JS**:
-
-### Ventajas y Capacidades:
-1. **Separación de Cómputo y Renderizado:** Python solo procesa video y telemetría ligera; el navegador web renderiza la interfaz fluida a 60 FPS mediante la GPU del cliente.
-2. **Selector de Vistas en Vivo:** Alterna al instante entre **Vista Combinada**, **Solo Cámara** o **Solo Mapa de Profundidad**.
-3. **Telemetría en Tiempo Real:**
-   - Badge gigante de estado (`FORWARD` en verde / `STOP` en rojo brillante con animación de pulso).
-   - Manómetro y barra de proximidad en porcentaje con marca del umbral.
-   - Gráfica temporal (Canvas 2D) con los últimos 15 segundos de historial de proximidad.
-   - Indicadores de FPS, backend de cómputo (`MPS`, `CUDA`, `CPU`) e intensidad.
-4. **Controles Interactivos en Vivo (sin reiniciar el script):**
-   - Slider para ajustar la distancia de activación del umbral `STOP` en tiempo real.
-   - Interruptor para silenciar o activar la alarma sonora local de la computadora.
-5. **Acceso Multi-Dispositivo:** Abre el dashboard desde tu Mac, PC, teléfono móvil (iPhone/Android) o tablet en la misma red WiFi.
-6. **Apagado Instantáneo:** Cierre limpio y seguro con `Ctrl + C` desde la terminal.
-
----
-
-## 📐 Métrica de Medición y Distancia de Activación
-
-- **¿Qué mide MiDaS?**
-  Calcula **Disparidad Inversa Relativa** ($d \propto \frac{1}{\text{distancia}}$). En [`normalize_depth()`](main-prueba.py) se normaliza de $0.0$ ($0\%$, punto más lejano) a $1.0$ ($100\%$, punto más cercano al lente).
-- **¿A qué distancia se activa `STOP`?**
-  Con el umbral estándar del $60\%$ (`--near-threshold 0.6`):
-  - **$> 2.5\text{ m}$ ($0\% - 30\%$):** `FORWARD` (Silencio).
-  - **$1.5\text{ m} - 2.5\text{ m}$ ($30\% - 59\%$):** `FORWARD` (Advertencia visual en telemetría).
-  - **$\approx 0.8\text{ m} - 1.5\text{ m}$ ($60\% - 84\%$):** **`STOP`** (Alarma activa de 700 Hz a 1200 Hz).
-  - **$< 0.5\text{ m}$ ($85\% - 100\%$):** **`STOP` Crítico** (Alarma máxima a 1500 Hz rápida).
-
----
-
-## 🚀 Guía de Usuario e Instalación
-
-### 1. Instalación
-```bash
-# Clonar repositorio
-git clone <URL_DEL_REPOSITORIO>
-cd ORION
-
-# Crear y activar entorno virtual
-python -m venv .venv
-# En Windows:
-.\.venv\Scripts\activate
-# En macOS/Linux:
-source .venv/bin/activate
-
-# Instalar dependencias
-pip install --upgrade pip
-pip install -r requirements.txt
+```text
+ORION/
+├── main.py                       # 🚀 Lanzador principal multi-versión (v5 por defecto)
+├── main_web_xiao.py              # 🔄 Wrapper de compatibilidad para scripts macOS (.sh)
+├── versions/                     # 📦 Módulos organizados por versión
+│   ├── v1_desktop_initial/       # Versión 1: Desktop OpenCV síncrono inicial
+│   ├── v2_desktop_optimized/     # Versión 2: Desktop multihilo con HUD y telemetría
+│   ├── v3_web_local/             # Versión 3: Servidor Web FastAPI con cámara local
+│   ├── v4_web_esp32/             # Versión 4: Servidor Web con ESP32-CAM AI-Thinker
+│   └── v5_web_xiao_esp32s3/      # Versión 5: Web XIAO ESP32S3 + Hot-Swap + Daemon [ACTUAL]
+├── docs/                         # 📚 Centro de documentación oficial
+│   ├── ARCHITECTURE.md           # Arquitectura profunda, IA, streaming y audio
+│   ├── VERSIONS.md               # Comparativa y evolución detallada de v1 a v5
+│   ├── HARDWARE_XIAO_ESP32S3.md  # Conexión, antena y flasheo de XIAO ESP32S3
+│   ├── HARDWARE_ESP32_CAM.md     # Programación FTDI para ESP32-CAM AI-Thinker
+│   ├── MACOS_SERVICE.md          # Configuración de arranque automático en macOS (.sh)
+│   └── API_AND_TELEMETRY.md      # Especificación de endpoints REST y WebSockets
+├── templates/
+│   └── index.html                # Interfaz web reactiva compartida
+├── utils/
+│   └── xiao_discovery.py         # Motor de escaneo y descubrimiento dinámico de red
+├── images/                       # Recursos gráficos y multimedia
+└── tests/                        # Scripts de diagnóstico de red y cámara
 ```
 
 ---
 
-### 2. Modo Escritorio (Ventana OpenCV)
+## 🚀 Inicio Rápido (Quick Start)
 
-Ejecuta [`main-prueba.py`](main-prueba.py) para abrir la ventana clásica de OpenCV:
+### 1. Instalación de Dependencias
 
-* **Con cámara web local:**
-  ```bash
-  python main-prueba.py --src 0
-  ```
-* **Con ESP32-CAM (Búsqueda automática en WiFi):**
-  ```bash
-  python main-prueba.py --auto-find
-  ```
-* **Con ESP32-CAM (Por IP directa):**
-  ```bash
-  python main-prueba.py --src http://192.168.1.50:81/stream --esp-base http://192.168.1.50
-  ```
+```bash
+# En macOS (Apple Silicon M1/M2/M3)
+pip install -r requirements-mac.txt
 
----
+# En Windows / Linux
+pip install -r requirements.txt
+```
 
-### 3. Modo Servicio Web (Dashboard HTML5)
+### 2. Iniciar el Sistema (Versión Insignia v5)
 
-Ejecuta [`main_web.py`](main_web.py) para iniciar el servidor web:
+Simplemente ejecuta el lanzador universal en la raíz del proyecto:
 
-* **Iniciar con cámara web:**
-  ```bash
-  python main_web.py --src 0
-  ```
-* **Iniciar con ESP32-CAM:**
-  ```bash
-  python main_web.py --auto-find
-  ```
-* **Forzar aceleración Apple Silicon (MPS) o puerto específico:**
-  ```bash
-  python main_web.py --src 0 --device mps --port 8080
-  ```
+```bash
+# Iniciar con detección automática
+python main.py
 
-**Acceso al Dashboard:**
-- Desde tu ordenador: Abre en el navegador **`http://localhost:8080`** (o el puerto indicado en terminal).
-- Desde tu celular o tablet: Abre **`http://<IP_DE_TU_PC>:8080`** conectado a la misma red WiFi.
+# En Mac (aceleración por Metal MPS y puerto específico)
+python main.py --device mps --port 8000
+
+# Con IP estática para la cámara XIAO
+python main.py --xiao-ip 172.16.121.118
+```
+
+El servidor abrirá automáticamente el panel web interactivo en [http://localhost:8000](http://localhost:8000).
 
 ---
 
-### 4. Modo Autónomo XIAO ESP32S3 (Hot-Swap & Rollback a Mac)
+## 🗂️ Selección de Versiones
 
-Ejecuta [`main_web_xiao.py`](main_web_xiao.py) o el lanzador rápido [`start_xiao.py`](start_xiao.py) para el sistema con conmutación autónoma:
+ORION permite ejecutar cualquier versión histórica o especializada mediante el argumento `--version` o `-V`:
 
-* **Lanzamiento rápido:**
-  ```bash
-  python start_xiao.py
-  ```
-* **Con parámetros personalizados:**
-  ```bash
-  python main_web_xiao.py --xiao-ip 172.16.121.4 --device mps
-  ```
+```bash
+# Listar todas las versiones disponibles y su descripción
+python main.py --list
 
-> [!TIP]
-> **Comportamiento Autónomo:** Si el XIAO está apagado o fuera de rango, el sistema arranca y funciona con la cámara web integrada de la Mac. En cuanto el XIAO se enciende y conecta a la red WiFi, el sistema **conmuta en caliente al stream inalámbrico sin reiniciar el servidor**. Si el XIAO se apaga, hace **rollback instantáneo a la Mac**.
+# Ejecutar una versión específica
+python main.py --version 1      # v1: Desktop Inicial (OpenCV)
+python main.py --version 2      # v2: Desktop Optimizado (HUD Telemetría)
+python main.py --version 3      # v3: Web Dashboard (Cámara Local)
+python main.py --version 4      # v4: Web ESP32-CAM (AI-Thinker)
+python main.py --version 5      # v5: Web XIAO ESP32S3 Sense (Por defecto)
+```
+
+Para más detalles sobre los cambios y diferencias entre versiones, consulta **[docs/VERSIONS.md](docs/VERSIONS.md)**.
 
 ---
 
-## ⚙️ Parámetros de Línea de Comandos (CLI)
+## 🌟 Características de la Versión Actual (v5)
+
+1. **30 FPS MJPEG Inalámbrico Continuo:**
+   - Firmware con reloj de sensor a 16 MHz y eliminación de timeouts TCP para eliminar congelamientos de fotograma.
+2. **Conmutación en Caliente (Hot-Swap) y Rollback:**
+   - Si la cámara XIAO se desconecta o se apaga, la cámara web integrada de la computadora toma el control en menos de 1 segundo sin reiniciar el servidor.
+   - Cuando el XIAO se reconecta, el sistema regresa al stream inalámbrico de forma transparente.
+3. **Arranque en Segundo Plano como Servicio en macOS:**
+   - Generación del archivo `.orion_port` en la raíz para sincronización con scripts automáticos `.sh` de inicio de sesión.
+4. **Telemetría WebSocket a 25 Hz:**
+   - Manómetro de proximidad, zonas de advertencia (izquierda, centro, derecha) y gráficas en vivo en [HTML5](templates/index.html).
+
+---
+
+## 📚 Documentación Técnica Detallada
+
+Para guías paso a paso de hardware y configuración del sistema operativo:
+
+* 🏗️ **[Arquitectura y Funcionamiento Interno](docs/ARCHITECTURE.md)**
+* 🛠️ **[Guía de Hardware: XIAO ESP32S3 Sense](docs/HARDWARE_XIAO_ESP32S3.md)**
+* 🛠️ **[Guía de Hardware: ESP32-CAM](docs/HARDWARE_ESP32_CAM.md)**
+* 🍎 **[Configuración de Servicio Automático en macOS](docs/MACOS_SERVICE.md)**
+* 🌐 **[Especificación de API REST y WebSockets](docs/API_AND_TELEMETRY.md)**
+
+---
+
+## ⚙️ Parámetros CLI Principales
 
 | Parámetro | Opciones / Tipo | Por Defecto | Descripción |
 | :--- | :--- | :--- | :--- |
-| `--src` | `0`, `1` o URL HTTP | `0` | Índice de cámara local o URL del stream del ESP32. |
-| `--auto-find` | Flag | `False` | Escanea la red local y se conecta automáticamente al ESP32-CAM. |
-| `--near-threshold` | Float (`0.0` a `1.0`) | `0.6` | Umbral de proximidad para activar el estado `STOP`. |
-| `--device` | `auto`, `mps`, `cuda`, `cpu` | `auto` | Backend de cómputo para la red neuronal. |
-| `--port` | Entero | `8000` / auto | Puerto HTTP para `main_web.py` (autodetecta puertos libres). |
-| `--no-local-sound` | Flag | `False` | Desactiva las alertas sonoras en la computadora. |
-| `--proc-width` | Entero | `320` | Ancho de imagen procesado por MiDaS (menor = más rápido). |
-| `--save` | String | `""` | Guarda el video procesado en archivo (ej. `output.mp4`). |
+| `--version`, `-V` | `1`, `2`, `3`, `4`, `5` | `5` | Versión de ORION a ejecutar. |
+| `--list`, `-l` | Flag | - | Muestra todas las versiones disponibles y sale. |
+| `--xiao-ip` | IP (`str`) | Auto-discovery | IP del XIAO ESP32S3 Sense. |
+| `--device` | `auto`, `cpu`, `cuda`, `mps` | `auto` | Dispositivo de cómputo para la red neuronal. |
+| `--port` | Entero | `8000` | Puerto del servidor web HTTP/WebSocket. |
+| `--near-threshold` | Float (`0.0` - `1.0`) | `0.60` | Umbral relativo para activar alerta de `STOP`. |
+| `--no-local-sound` | Flag | Desactivado | Desactiva las alarmas sonoras locales. |
 
 ---
 
-## 🛠️ Herramientas Auxiliares
+## 👥 Autores y Mantenimiento
 
-- **[`find_esp32.py`](find_esp32.py):** Escanea la red local para identificar la dirección IP del ESP32-CAM.
-- **[`test_esp32.py`](test_esp32.py):** Comprueba la conectividad TCP y la respuesta del stream de video.
-- **[`diagnose_network.py`](diagnose_network.py):** Diagnóstico de velocidad y estabilidad del enlace de red.
-- **[`CameraWebServer/`](CameraWebServer/):** Código fuente / sketch Arduino para la placa ESP32-CAM.
-
----
-
-<div align="center">
-  <sub>Proyecto <b>ORION</b> • Visión Artificial & Navegación Autónoma / Asistida.</sub>
-</div>
+* **Desarrollo y Arquitectura:** Equipo ORION
+* **Licencia:** MIT
